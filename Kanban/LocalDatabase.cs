@@ -1,21 +1,13 @@
-﻿namespace Kanban;
-using Newtonsoft.Json;
-using Kanban.Interfaces;
-using System.IO;
-using log4net;
-using log4net.Config;
-
-public sealed class LocalDatabase : IDatabase
+﻿using Kanban.Interfaces;
+namespace Kanban;
+using IndexType = Dictionary<ItemStatus, Dictionary<Guid, ContainerMetaData>>;
+public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
 {
-    private static readonly ILog logger = LogManager.GetLogger(typeof(LocalDatabase));
     public static Lazy<LocalDatabase> Database {
-        get => new(() => new LocalDatabase());
+        get => Database ?? new(() => new LocalDatabase());
     }
-    public List<IKanbanContainer> Containers { get; } = new();
-
-    private static readonly string _LocalDataDir = ".kanban"; // TODO: Expose this a config var
-    private static readonly string _IndexFileName = ".index";
-    private readonly string _indexFilePath = "";
+    private IndexType _index = new();
+    private Dictionary<Guid, KanbanBoard> _loadedContainers = new();
 
     public LocalDatabase()
     {
@@ -24,62 +16,98 @@ public sealed class LocalDatabase : IDatabase
             BasicConfigurator.Configure();
         else
             XmlConfigurator.Configure(configFile:log4netConfig);
-
-        string currentDir = Directory.GetCurrentDirectory();
-        string localDataDir = Path.Combine(currentDir, _LocalDataDir);
-
-        if (!Path.Exists(localDataDir))
-        {
-            Directory.CreateDirectory(localDataDir);
-        }
-        else
-        {
-            _indexFilePath = Path.Combine(localDataDir, _IndexFileName);
-            if (!Path.Exists(_indexFilePath))
-            {
-                logger.Warn($"Failed to find Index file at: {_indexFilePath}");
-            }
-            else
-            {
-                try 
-                {
-                    var containers = LoadIndexFile(_indexFilePath) ?? new();
-                    foreach(var container in containers)
-                    {
-                        var cast = container as IKanbanContainer;
-                        if (cast != null)
-                            Containers.Add(cast);
-                    }
-                }
-                catch (JsonReaderException exp)
-                {
-                    logger.Warn($"Failed to parse Index file with exception: {exp.Message}");
-                    Containers = new();
-                }
-            }
-        }
     }
     ~LocalDatabase()
     {
-        SaveIndexFile();
     }
 
-    public void AddContainer(IKanbanContainer newContainer) => Containers.Add(newContainer);
-    public void RemoveContainer(int containerID) => Containers.RemoveAt(containerID);
-    public IKanbanContainer? GetContainer(int containerID) => Containers.ElementAtOrDefault(containerID);
-    public string SaveIndexFile()
+    public KanbanBoard? GetContainer(Guid guid)
     {
-        using StreamWriter sw = new(_indexFilePath);
-        using JsonWriter writer = new JsonTextWriter(sw);
-        JsonSerializer serializer = new();
-        serializer.Serialize(writer, Containers);
-        return _indexFilePath;
+        KanbanBoard? board;
+        if (_loadedContainers.TryGetValue(guid, out board))
+            return board;
+        foreach ((var _, var containerDict) in _index) 
+        {
+            if (containerDict.TryGetValue(guid, out ContainerMetaData metaData))
+            {
+                board = loadContainer(guid, metaData);
+                break;
+            }
+        }
+        return board;
     }
-    public List<KanbanBoard>? LoadIndexFile(string indexFilePath)
+
+    public KanbanBoard? FindContainer(string query)
     {
-        using StreamReader reader = new StreamReader(indexFilePath);
-        using JsonReader jsonReader = new JsonTextReader(reader);
-        JsonSerializer serializer = new();
-        return serializer.Deserialize<List<KanbanBoard>>(jsonReader);
+        KanbanBoard? board = _loadedContainers.Where(kv => kv.Value.Name.Contains(query))?.First().Value;
+        if (board == null)
+        {
+            foreach ((var _, var containerDict) in _index) 
+            {
+                KeyValuePair<Guid,ContainerMetaData>? container = containerDict.Where(kv => kv.Value.Name.Contains(query))?.First();
+                if (container != null)
+                {
+                    board = loadContainer(container.Value.Key, container.Value.Value);
+                    return board;
+                }
+            }               
+        }
+        return board;
+    }
+
+    public void AddContainer(KanbanBoard newContainer, ItemStatus status = ItemStatus.PENDING)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void RemoveContainer(Guid guid)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void MoveContainer(Guid guid, ItemStatus newStatus)
+    {
+        throw new NotImplementedException();
+    }
+    private KanbanBoard loadContainer(Guid guid, ContainerMetaData metaData)
+    {
+        KanbanBoard board = new(metaData);
+        _loadedContainers.Add(guid, board);
+        return board;
+    }
+ 
+    public IEnumerable<KanbanBoard> GetLoadedContainers()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<bool> SaveAsync(JsonSerializer _)
+    {
+        throw new NotImplementedException();
+    }
+
+    void IDatabase<KanbanBoard>.Init()
+    {
+        throw new NotImplementedException();
+    }
+
+    void IDatabase<KanbanBoard>.DeInit()
+    {
+        throw new NotImplementedException();
+    }
+
+    Task<bool> IDatabase<KanbanBoard>.PreLoadContainers()
+    {
+        throw new NotImplementedException();
+    }
+
+    IndexType IDatabase<KanbanBoard>.GetIndex()
+    {
+        throw new NotImplementedException();
+    }
+
+    void IDatabase<KanbanBoard>.SetIndex()
+    {
+        throw new NotImplementedException();
     }
 }
