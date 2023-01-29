@@ -6,16 +6,21 @@ classDiagram
         +void Undo()
         +void Redo() 
     }
+    class ISerializable~ReturnType~{
+        <<interface>>
+        +SaveAsync()
+        +LoadAsync()
+    }
 
     class IDatabase{
         <<interface>>
         +IDatabase Database        
-        +KeyValueStore Collections
-        -KeyValueStore index
+        +GetContainer()
+        +FindContainer()
+        +AddContainer()
+        +AddContainer()
         -Init()
         -Deinit()
-        +Save()
-        +Load()
     }
 
     class IKanbanCollection {

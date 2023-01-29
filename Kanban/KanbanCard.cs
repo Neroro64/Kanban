@@ -1,14 +1,19 @@
-﻿namespace Kanban;
-using Kanban.Interfaces;
+﻿using Kanban.Abstract;
+namespace Kanban;
 
 [Serializable]
-internal class KanbanCard : IKanbanItem
+public sealed class KanbanCard : Undoable, IKanbanItem
 {
-    public int ID { get; init; }
-    public string Name { get; set; } = "";
+    public ItemStatus Status { get; set; } = ItemStatus.PENDING;
+    public Guid Guid { get; init; } = Guid.NewGuid();
+    public string Name { get; set; } = "KanbanCard";
+    public KanbanContainer? Parent { get; set; }
     public string? Details { get; set; }
-    public uint Priority { get; set; }
-    public IKanbanItem.ItemStatus Status { get; set; } = IKanbanItem.ItemStatus.PENDING;
+    public ItemPriority Priority { get; set; } = ItemPriority.Low;
     public DateTime DateCreated { get; init; } = DateTime.Now;
     public DateTime? DateClosed { get; init; }
+    public DateTime? Deadline { get; set; }
+    public IList<IKanbanItem>? Links { get; set; }
+    public IList<string>? Comments { get; init; }
+
 }

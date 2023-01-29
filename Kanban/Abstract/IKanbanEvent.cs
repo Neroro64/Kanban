@@ -1,4 +1,4 @@
-namespace Kanban.Interface;
+namespace Kanban.Abstract;
 
 public interface IKanbanEvent 
 {

@@ -1,19 +1,9 @@
-﻿namespace Kanban;
-using Kanban.Interfaces;
+﻿using Kanban.Abstract;
+namespace Kanban;
 
-[Serializable]
-internal class KanbanList : IKanbanContainer
+public class KanbanList : KanbanContainer
 {
-    public int ID { get; init; }
-    public string Name { get; set; } = "";
-    public string? Details { get; set; }
-    public uint Priority { get; set; }
-    public IKanbanItem.ItemStatus Status { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public DateTime DateCreated { get; init; } = DateTime.Now;
-    public DateTime? DateClosed { get; init; }
+    public string Name {get; set;} = "KanbanList";
+    public new MetaData Meta { get => throw new NotImplementedException(); init => throw new NotImplementedException(); }
 
-    private readonly List<IKanbanItem> _kanbanItems = new();
-    public void AddKanbanItem(IKanbanItem item) => _kanbanItems.Add(item);
-    public IKanbanItem GetKanbanItem(int itemId) => _kanbanItems[itemId];
-    public void RemoveKanbanItem(int itemId) => _kanbanItems.RemoveAt(itemId);
 }

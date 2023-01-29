@@ -1,12 +1,14 @@
-﻿using Kanban.Interfaces;
+﻿using Kanban.Abstract;
 namespace Kanban;
-using IndexType = Dictionary<ItemStatus, Dictionary<Guid, ContainerMetaData>>;
-public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
+public sealed class LocalDatabase : Database<KanbanBoard>
 {
-    public static Lazy<LocalDatabase> Database {
-        get => Database ?? new(() => new LocalDatabase());
+    private static readonly Lazy<LocalDatabase> _database = new(() => new LocalDatabase());
+    public static LocalDatabase s_Database
+    {
+        get  {return _database.Value;}
     }
-    private IndexType _index = new();
+    public Dictionary<ItemStatus, Dictionary<Guid, KanbanContainer.MetaData>> Index { get; set; } = new();
+
     private Dictionary<Guid, KanbanBoard> _loadedContainers = new();
 
     public LocalDatabase()
@@ -15,20 +17,24 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
         if (!log4netConfig.Exists)
             BasicConfigurator.Configure();
         else
-            XmlConfigurator.Configure(configFile:log4netConfig);
+            XmlConfigurator.Configure(configFile: log4netConfig);
+        
+        foreach (var status in Enum.GetValues(typeof(ItemStatus)).Cast<ItemStatus>())
+            Index[status] = new();
     }
     ~LocalDatabase()
     {
+        DeInit();
     }
 
-    public KanbanBoard? GetContainer(Guid guid)
+    public override KanbanBoard? GetContainer(Guid guid)
     {
         KanbanBoard? board;
         if (_loadedContainers.TryGetValue(guid, out board))
             return board;
-        foreach ((var _, var containerDict) in _index) 
+        foreach ((var _, var containerDict) in Index)
         {
-            if (containerDict.TryGetValue(guid, out ContainerMetaData metaData))
+            if (containerDict.TryGetValue(guid, out KanbanContainer.MetaData metaData))
             {
                 board = loadContainer(guid, metaData);
                 break;
@@ -37,77 +43,99 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
         return board;
     }
 
-    public KanbanBoard? FindContainer(string query)
+    public override IEnumerable<KanbanBoard>? FindContainers(string query)
     {
-        KanbanBoard? board = _loadedContainers.Where(kv => kv.Value.Name.Contains(query))?.First().Value;
+        var foundContainers = GetLoadedContainers().Where(container => container.Name.Contains(query));
+        if (foundContainers != null && foundContainers.Count() > 0)
+            return foundContainers;
+
+        foreach ((ItemStatus _, var containerDict) in Index)
+        {
+            var containers = containerDict.Where(kv => kv.Value.FilePath.Contains(query));
+            if (containers != null)
+            {
+                return containers.Select(kv => loadContainer(kv.Key, kv.Value));
+            }
+        }
+        return null;
+    }
+
+    public override KanbanBoard NewContainer(string name="NewContainer")
+    {
+        KanbanBoard board = new(name, new KanbanContainer.MetaData() { FilePath = GetRelativeFilePath(name + ".json") });
+        return board;
+    }
+    public override void AddContainer(KanbanBoard newContainer)
+    {
+        _loadedContainers.TryAdd(newContainer.Guid, newContainer);
+        if (!Index[newContainer.Status].TryAdd(newContainer.Guid, newContainer.Meta))
+        {
+            s_Logger.Warn($"""
+            Failed to add new container with GUID: {newContainer.Guid},
+            because it already exists: {GetContainer(newContainer.Guid)}
+            """);
+            return;
+        }
+    }
+
+    public override void RemoveContainer(Guid guid, bool unload = true)
+    {
+        if (unload && _loadedContainers.ContainsKey(guid))
+            _loadedContainers.Remove(guid);
+
+        foreach (var kv in Index.Values)
+        {
+            if (kv.ContainsKey(guid))
+            {
+                kv.Remove(guid);
+                break;
+            }
+        }
+    }
+
+    public override void MoveContainer(Guid guid, ItemStatus newStatus)
+    {
+        KanbanBoard? board = GetContainer(guid);
         if (board == null)
         {
-            foreach ((var _, var containerDict) in _index) 
-            {
-                KeyValuePair<Guid,ContainerMetaData>? container = containerDict.Where(kv => kv.Value.Name.Contains(query))?.First();
-                if (container != null)
-                {
-                    board = loadContainer(container.Value.Key, container.Value.Value);
-                    return board;
-                }
-            }               
+            s_Logger.Error($"Container to be moved not found in database! Guid: {guid}");
+            return;
         }
-        return board;
+        board.Status = newStatus;
+        RemoveContainer(guid, unload: false);
+        Index[newStatus][guid] = board.Meta;
     }
 
-    public void AddContainer(KanbanBoard newContainer, ItemStatus status = ItemStatus.PENDING)
+    public override IEnumerable<KanbanBoard> GetLoadedContainers()
     {
-        throw new NotImplementedException();
+        return _loadedContainers.Values;
     }
 
-    public void RemoveContainer(Guid guid)
+    protected override void Init()
     {
-        throw new NotImplementedException();
+        (this as ISerializable<bool>).LoadAsync().Wait();
     }
 
-    public void MoveContainer(Guid guid, ItemStatus newStatus)
+    protected override void DeInit()
     {
-        throw new NotImplementedException();
+        (this as ISerializable<bool>).SaveAsync().Wait();
     }
-    private KanbanBoard loadContainer(Guid guid, ContainerMetaData metaData)
+
+    protected override Task<bool> PreLoadContainers()
     {
-        KanbanBoard board = new(metaData);
+        return Task.Run(() =>
+        {
+            Parallel.ForEach(Index[ItemStatus.ONGOING], kv =>
+            {
+                loadContainer(kv.Key, kv.Value);
+            });
+            return true;
+        });
+    }
+    private KanbanBoard loadContainer(Guid guid, KanbanContainer.MetaData metaData)
+    {
+        KanbanBoard board = Load<KanbanBoard>(metaData.FilePath).Result;
         _loadedContainers.Add(guid, board);
         return board;
-    }
- 
-    public IEnumerable<KanbanBoard> GetLoadedContainers()
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<bool> SaveAsync(JsonSerializer _)
-    {
-        throw new NotImplementedException();
-    }
-
-    void IDatabase<KanbanBoard>.Init()
-    {
-        throw new NotImplementedException();
-    }
-
-    void IDatabase<KanbanBoard>.DeInit()
-    {
-        throw new NotImplementedException();
-    }
-
-    Task<bool> IDatabase<KanbanBoard>.PreLoadContainers()
-    {
-        throw new NotImplementedException();
-    }
-
-    IndexType IDatabase<KanbanBoard>.GetIndex()
-    {
-        throw new NotImplementedException();
-    }
-
-    void IDatabase<KanbanBoard>.SetIndex()
-    {
-        throw new NotImplementedException();
     }
 }

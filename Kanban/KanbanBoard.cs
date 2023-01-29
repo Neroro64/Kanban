@@ -1,84 +1,54 @@
-﻿namespace Kanban;
+﻿using Kanban.Abstract;
+namespace Kanban;
 
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Kanban.Interfaces;
-using Newtonsoft.Json;
-
-[Serializable]
-public sealed class KanbanBoard : Undoable, IKanbanContainer
+public sealed class KanbanBoard :  KanbanContainer, IKanbanItem
 {
-    public int ID { get ; init ; }
-    public string Name { get; set; } = "";
-    public string? Details { get ; set ; }
-    public uint Priority { get ; set ; }
-    public IKanbanItem.ItemStatus Status { get; set; } = IKanbanItem.ItemStatus.PENDING;
+    public MetaData Meta { get; init; } = default;
+    public ItemStatus Status { get; set; } = ItemStatus.PENDING;
+    public Guid Guid { get; init; } = Guid.NewGuid();
+    public string Name { get; set; } = "KanbanBoard";
+    public KanbanContainer? Parent { get; set; }
+    public string? Details { get; set; }
+    public ItemPriority Priority { get; set; } = ItemPriority.Low;
     public DateTime DateCreated { get; init; } = DateTime.Now;
-    public DateTime? DateClosed { get ; init ; }
-    ItemStatus IKanbanItem.Status { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public Guid Guid { get => throw new NotImplementedException(); init => throw new NotImplementedException(); }
-    public IKanbanContainer Parent { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public DateTime? Deadline { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public IList<IKanbanItem>? Links { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public IList<string>? Comments { get => throw new NotImplementedException(); init => throw new NotImplementedException(); }
+    public DateTime? DateClosed { get; init; }
+    public DateTime? Deadline { get; set; }
+    public IList<IKanbanItem>? Links { get; set; }
+    public IList<string>? Comments { get; init; }
 
-    private readonly Dictionary<string, IKanbanContainer> _kanbanLists = new();
-
-    public KanbanBoard(ContainerMetaData metaData) 
+    private Dictionary<string, KanbanList> m_lists = new();
+    public KanbanBoard(){}
+    public KanbanBoard(string name, MetaData meta)
     {
-
+        Meta = meta;
+        Name = name;
+        Status = ItemStatus.PENDING;
+        Guid = Guid.NewGuid();
+        Priority = ItemPriority.Low;
+        DateCreated = DateTime.Now;
     }
-    void AddKanbanContainer(IKanbanContainer item) => _kanbanLists.Add(item.Name, item);
-    void IKanbanContainer.AddKanbanItem(IKanbanItem item)
+    
+    public void AddKanbanList(KanbanList list)
     {
-        if (item is IKanbanContainer container)
-            _kanbanLists.Add(item.Name, container);
-    }
-
-    void RemoveKanbanContainer(string key) => _kanbanLists.Remove(key);
-    void IKanbanContainer.RemoveKanbanItem(int id)
-    {
-        _kanbanLists.Remove(_kanbanLists.First(x => x.Value.ID == id).Key);
+        m_lists.TryAdd(list.Name, list);
     }
 
-    IKanbanContainer GetKanbanContainer(string key) => _kanbanLists[key];
-    IKanbanItem IKanbanContainer.GetKanbanItem(int id)
+    public IEnumerable<KanbanList>? FindKanbanLists(string query)
     {
-        return _kanbanLists.First(x => x.Value.ID == id).Value;
+        return m_lists.Values.Where(item => item.Name.Contains(query));
     }
 
-    public IKanbanItem GetKanbanItem(Guid itemGuid)
+    public KanbanList? GetKanbanList(string name)
     {
-        throw new NotImplementedException();
+        if (m_lists.TryGetValue(name, out var list))
+            return list;
+        return null;
     }
 
-    public IKanbanItem FindKanbanItem(Guid itemGuid)
+    public void RemoveKanbanList(string name)
     {
-        throw new NotImplementedException();
+        if (m_lists.ContainsKey(name))
+            m_lists.Remove(name);
     }
-
-    public void RemoveKanbanItem(Guid itemGuid)
-    {
-        throw new NotImplementedException();
-    }
-
-    public static IKanbanContainer CreatePlaceHolder(ContainerMetaData metaData)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<Tuple<string, string>> SaveAsync()
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<Tuple<string, string>> SaveAsync(JsonSerializer _)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<bool> LoadAsync()
-    {
-        throw new NotImplementedException();
-    }
+    
 }

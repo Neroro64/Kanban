@@ -1,4 +1,4 @@
-namespace Kanban.Interfaces;
+namespace Kanban.Abstract;
 public abstract class Undoable 
 {
     public class TransactionEventArgs : System.EventArgs
