@@ -1,13 +1,13 @@
 ﻿using Kanban.Abstract;
 namespace Kanban;
 
-public sealed class KanbanBoard :  KanbanContainer, IKanbanItem
+public sealed class KanbanBoard :  KanbanContainer<KanbanList>, IKanbanItem
 {
     public MetaData Meta { get; init; } = default;
     public ItemStatus Status { get; set; } = ItemStatus.PENDING;
     public Guid Guid { get; init; } = Guid.NewGuid();
     public string Name { get; set; } = "KanbanBoard";
-    public KanbanContainer? Parent { get; set; }
+    public KanbanContainer<IKanbanItem>? Parent {get; set;} = default;
     public string? Details { get; set; }
     public ItemPriority Priority { get; set; } = ItemPriority.Low;
     public DateTime DateCreated { get; init; } = DateTime.Now;
@@ -27,28 +27,4 @@ public sealed class KanbanBoard :  KanbanContainer, IKanbanItem
         Priority = ItemPriority.Low;
         DateCreated = DateTime.Now;
     }
-    
-    public void AddKanbanList(KanbanList list)
-    {
-        m_lists.TryAdd(list.Name, list);
-    }
-
-    public IEnumerable<KanbanList>? FindKanbanLists(string query)
-    {
-        return m_lists.Values.Where(item => item.Name.Contains(query));
-    }
-
-    public KanbanList? GetKanbanList(string name)
-    {
-        if (m_lists.TryGetValue(name, out var list))
-            return list;
-        return null;
-    }
-
-    public void RemoveKanbanList(string name)
-    {
-        if (m_lists.ContainsKey(name))
-            m_lists.Remove(name);
-    }
-    
 }

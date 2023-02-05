@@ -7,7 +7,7 @@ public sealed class KanbanCard : Undoable, IKanbanItem
     public ItemStatus Status { get; set; } = ItemStatus.PENDING;
     public Guid Guid { get; init; } = Guid.NewGuid();
     public string Name { get; set; } = "KanbanCard";
-    public KanbanContainer? Parent { get; set; }
+    public KanbanContainer<IKanbanItem>? Parent { get; set; }
     public string? Details { get; set; }
     public ItemPriority Priority { get; set; } = ItemPriority.Low;
     public DateTime DateCreated { get; init; } = DateTime.Now;

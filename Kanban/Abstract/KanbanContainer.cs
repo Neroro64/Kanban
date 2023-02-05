@@ -1,27 +1,27 @@
-﻿namespace Kanban.Abstract;
+﻿using System.Collections;
+
+namespace Kanban.Abstract;
 [Serializable]
-public abstract class KanbanContainer : Undoable, ISerializable<KanbanContainer.MetaData>
+public abstract class KanbanContainer<T> : Undoable, ISerializable<KanbanContainer<T>.MetaData>, IEnumerable<T> where T : IIdentifiable
 {
-    public MetaData Meta { get; init; } = default;
-    protected Dictionary<Guid, IKanbanItem> m_items = new();
-    public virtual void AddKanbanItem(IKanbanItem item)
+    public MetaData FileMeta { get; init; } = default;
+    protected Dictionary<Guid, T> m_items = new();
+    public virtual void Add(T item)
     {
         m_items.TryAdd(item.Guid, item);
     }
 
-    public virtual IEnumerable<IKanbanItem>? FindKanbanItems(string query)
+    public virtual IEnumerable<T>? Find(string query)
     {
         return m_items.Values.Where(item => item.Name.Contains(query));
     }
 
-    public virtual IKanbanItem? GetKanbanItem(Guid itemGuid)
+    public virtual bool TryGet(Guid itemGuid, ref T? itemRef)
     {
-        if (m_items.TryGetValue(itemGuid, out var item))
-            return item;
-        return null;
+        return m_items.TryGetValue(itemGuid, out itemRef);
     }
 
-    public virtual void RemoveKanbanItem(Guid itemGuid)
+    public virtual void Remove(Guid itemGuid)
     {
         if (m_items.ContainsKey(itemGuid))
             m_items.Remove(itemGuid);
@@ -43,17 +43,29 @@ public abstract class KanbanContainer : Undoable, ISerializable<KanbanContainer.
             try
             {
                 string serializedData = JsonConvert.SerializeObject(this, settings);
-                return this.Meta with { Data = serializedData };
+                return this.FileMeta with { Data = serializedData };
             }
             catch (JsonSerializationException) { throw; }
         }));
     }
+
+    public IEnumerator<T> GetEnumerator()
+    {
+        return m_items.Values.GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return this.GetEnumerator();
+    }
+
     [Serializable]
-    public record struct MetaData 
-    { 
-        public string FilePath {get; init;}
-        public string? Data {get; init;}
-        public MetaData(string filePath, string? data){
+    public record struct MetaData
+    {
+        public string FilePath { get; init; }
+        public string? Data { get; init; }
+        public MetaData(string filePath, string? data)
+        {
             this.FilePath = filePath;
             this.Data = data;
         }
