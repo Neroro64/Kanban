@@ -2,13 +2,18 @@
 
 namespace Kanban.Abstract;
 [Serializable]
-public abstract class KanbanContainer<T> : Undoable, ISerializable<KanbanContainer<T>.MetaData>, IEnumerable<T> where T : IIdentifiable
+[JsonObject]
+public abstract class KanbanContainer<T> : Undoable, ISerializable<KanbanContainer<T>.MetaData>, IIdentifiable, IEnumerable<T> where T : IIdentifiable
 {
-    public MetaData FileMeta { get; init; } = default;
-    protected Dictionary<Guid, T> m_items = new();
+    public Guid Guid { get; init; } = Guid.NewGuid();
+    public string Name { get; set; } = "NewKanbanContainer";
+    public Guid? Parent { get; set; } = default;
+    [JsonIgnore] public MetaData FileMeta { get; init; } = default;
+    [JsonProperty] protected Dictionary<Guid, T> m_items = new();
     public virtual void Add(T item)
     {
-        m_items.TryAdd(item.Guid, item);
+        if (m_items.TryAdd(item.Guid, item))
+            item.Parent = this.Guid;
     }
 
     public virtual IEnumerable<T>? Find(string query)
@@ -20,7 +25,6 @@ public abstract class KanbanContainer<T> : Undoable, ISerializable<KanbanContain
     {
         return m_items.TryGetValue(itemGuid, out itemRef);
     }
-
     public virtual void Remove(Guid itemGuid)
     {
         if (m_items.ContainsKey(itemGuid))

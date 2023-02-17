@@ -2,9 +2,13 @@
 namespace Kanban;
 public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
 {
-    protected JsonSerializerSettings SerializerSettings
+    private JsonSerializerSettings SerializerSettings
     {
-        get => new() { Formatting = Formatting.Indented };
+        get => new() 
+        { 
+            PreserveReferencesHandling = PreserveReferencesHandling.All,
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+        };
     }
 
     private static readonly Lazy<LocalDatabase> _database = new(() => new LocalDatabase());
@@ -51,14 +55,27 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
         return board;
     }
 
-    public IKanbanItem? GetItem(Guid guid)
+    public IIdentifiable? GetItem(Guid guid)
     {
-        // TODO: Need a way to search in all items ever created.
+        // TODO: Need to be able to search thourhg all existing items, not just loaded ones
+        // TODO: Parallelize the search
         foreach ((var _, var container) in _loadedContainers)
         {
-            KanbanList? itemRef = default;
-            if (container.TryGet(guid, ref itemRef))
-                return itemRef as IKanbanItem;
+            if (container.Any(list => list.Guid == guid))
+            {
+                KanbanList? itemRef = default;
+                container.TryGet(guid, ref itemRef);
+                return itemRef as IIdentifiable;
+            }
+            foreach(var list in container)
+            {
+                if (list.Any(item => item.Guid == guid))
+                {
+                    KanbanCard? itemRef = default;
+                    list.TryGet(guid, ref itemRef);
+                    return itemRef as IIdentifiable;
+                }
+            }
         }
         return null;
     }
@@ -80,16 +97,18 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
         return null;
     }
 
-    public KanbanBoard NewContainer(string name = "NewContainer")
+    public KanbanBoard NewContainer(string name = "NewContainer", bool addToDatabase=true)
     {
         KanbanBoard board = new(name, new KanbanBoard.MetaData() { FilePath = GetRelativeFilePath(name + ".json") });
+        if (addToDatabase)
+            AddContainer(board);
         return board;
     }
 
     public void AddContainer(KanbanBoard newContainer)
     {
         _loadedContainers.TryAdd(newContainer.Guid, newContainer);
-        if (!Index[newContainer.Status].TryAdd(newContainer.Guid, newContainer.Meta))
+        if (!Index[newContainer.Status].TryAdd(newContainer.Guid, newContainer.FileMeta))
         {
             IDatabase<KanbanBoard>.s_Logger.Warn($"""
             Failed to add new container with GUID: {newContainer.Guid},
@@ -124,7 +143,7 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
         }
         board.Status = newStatus;
         RemoveContainer(guid, unload: false);
-        Index[newStatus][guid] = board.Meta;
+        Index[newStatus][guid] = board.FileMeta;
     }
 
     public IEnumerable<KanbanBoard> GetLoadedContainers()
@@ -222,9 +241,8 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
             Parallel.ForEach(containerData, data =>
             {
                 (string filePath, string? serializedData) = data;
-                using StreamWriter sw = new(filePath);
-                using JsonWriter writer = new JsonTextWriter(sw);
-                serializer.Serialize(writer, serializedData);
+                using StreamWriter sw = new(Path.Combine(localDataDir, filePath));
+                sw.Write(serializedData);
             });
         }
         catch (AggregateException ae)
@@ -274,8 +292,12 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
     {
         return Task.Run(() =>
         {
+            filePath = Path.Combine(_LocalDataDir, filePath);
             if (!Path.Exists(filePath))
+            {
+                IDatabase<KanbanBoard>.s_Logger.Warn($"Loading file failed. Path not found: {filePath}");
                 return new T();
+            }
             try
             {
                 using StreamReader reader = new StreamReader(filePath);
@@ -283,14 +305,20 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
                 JsonSerializer serializer = JsonSerializer.Create(SerializerSettings);
                 return serializer.Deserialize<T>(jsonReader) ?? new T();
             }
-            catch (JsonReaderException exp)
-            {
-                IDatabase<KanbanBoard>.s_Logger.Warn($"Failed to parse file with exception: {exp.Message}");
-                throw;
-            }
             catch (Exception exp)
             {
-                IDatabase<KanbanBoard>.s_Logger.Warn($"Failed to load file with error: {exp.Message}");
+                switch(exp) 
+                {
+                    case JsonReaderException: 
+                        IDatabase<KanbanBoard>.s_Logger.Warn($"Failed to parse file with exception: {exp.Message}");
+                        break;
+                    case JsonSerializationException:
+                        IDatabase<KanbanBoard>.s_Logger.Warn($"Failed to deserialize file with exception: {exp.Message}");
+                        break;
+                    default:
+                        IDatabase<KanbanBoard>.s_Logger.Warn($"Failed to load file with error: {exp.Message}");
+                        break;
+                }
                 throw;
             }
         });

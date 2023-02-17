@@ -3,4 +3,5 @@ public interface IIdentifiable
 {
     public Guid Guid {get; init;}
     public string Name {get; set;}
+    public Guid? Parent {get; set;}
 }

@@ -5,9 +5,9 @@ public interface IDatabase<ContainerType> : ISerializable<bool>
 
     #region Container Methods
     public ContainerType? GetContainer(Guid guid);
-    public IKanbanItem? GetItem(Guid guid);
+    public IIdentifiable? GetItem(Guid guid);
     public IEnumerable<ContainerType>? FindContainers(string query);
-    public ContainerType NewContainer(string name = "NewContainer");
+    public ContainerType NewContainer(string name = "NewContainer", bool addToDatabase=true);
     public void AddContainer(ContainerType newContainer);
     public void RemoveContainer(Guid guid, bool unload = true);
     public void MoveContainer(Guid guid, ItemStatus newStatus);
