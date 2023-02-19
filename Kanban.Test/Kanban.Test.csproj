@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kanban\Kanban.csproj" />
+    <ProjectReference Include="..\Kanban.Cmdlet\Kanban.Cmdlet.csproj" />
   </ItemGroup>
 
 </Project>
