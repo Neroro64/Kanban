@@ -1,9 +1,14 @@
 namespace Kanban.Cmdlet;
+using System.Management.Automation;
 
 [Cmdlet(VerbsCommon.Get, "KanbanIndex")]
-[OutputType(typeof(Dictionary<ItemStatus, KanbanBoard.MetaData>))]
-public class GetKanbanIndexCommand : PSCmdlet
+[OutputType(typeof(Dictionary<ItemStatus, Dictionary<Guid, KanbanBoard.MetaData>>))]
+public class GetKanbanIndexCommand : Cmdlet
 {
+    protected override void ProcessRecord()
+    {
+        Console.Out.WriteLine("Yo");
+    }
     protected override void EndProcessing()
     {
         WriteObject(LocalDatabase.s_Database.Index, true);
@@ -12,7 +17,7 @@ public class GetKanbanIndexCommand : PSCmdlet
 
 [Cmdlet(VerbsCommon.Find, "KanbanBoard")]
 [OutputType(typeof(List<KanbanBoard>))]
-public class FindKanbanBoardCommand : PSCmdlet
+public class FindKanbanBoardCommand : Cmdlet
 {
     [Parameter(
         Position = 0,
@@ -30,7 +35,7 @@ public class FindKanbanBoardCommand : PSCmdlet
 
 [Cmdlet(VerbsCommon.Get, "KanbanBoard")]
 [OutputType(typeof(KanbanBoard))]
-public class GetKanbanBoardCommand : PSCmdlet
+public class GetKanbanBoardCommand : Cmdlet
 {
     [Parameter(
         Position = 0,
@@ -48,7 +53,7 @@ public class GetKanbanBoardCommand : PSCmdlet
 
 [Cmdlet(VerbsCommon.New, "KanbanBoard")]
 [OutputType(typeof(KanbanBoard))]
-public class NewKanbanBoardCommand : PSCmdlet
+public class NewKanbanBoardCommand : Cmdlet
 {
     [Parameter(
         Position = 0,
@@ -77,7 +82,7 @@ public class NewKanbanBoardCommand : PSCmdlet
 }
 
 [Cmdlet(VerbsCommon.Remove, "KanbanBoard")]
-public class RemoveKanbanBoardCommand : PSCmdlet
+public class RemoveKanbanBoardCommand : Cmdlet
 {
     [Parameter(
         Position = 0,
