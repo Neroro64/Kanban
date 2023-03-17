@@ -30,6 +30,8 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
 
         foreach (var status in Enum.GetValues(typeof(ItemStatus)).Cast<ItemStatus>())
             Index[status] = new();
+
+        Init();
     }
 
     ~LocalDatabase()
@@ -37,6 +39,33 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
         DeInit();
     }
 
+
+    #region Initialization
+    public void Init() => (this as ISerializable<bool>).LoadAsync().Wait();
+
+    public void DeInit() => (this as ISerializable<bool>).SaveAsync().Wait();
+
+    public Task<bool> PreLoadContainers()
+    {
+        return Task.Run(() =>
+        {
+            Parallel.ForEach(Index[ItemStatus.ONGOING], kv =>
+            {
+                loadContainer(kv.Key, kv.Value);
+            });
+            return true;
+        });
+    }
+
+    private KanbanBoard loadContainer(Guid guid, KanbanBoard.MetaData metaData)
+    {
+        KanbanBoard board = Load<KanbanBoard>(metaData.FilePath).Result;
+        _loadedContainers.Add(guid, board);
+        return board;
+    }
+
+    public string GetRelativeFilePath(string name) { return Path.Combine(_ContainerDataDir, name); }
+    #endregion
 
     #region Container Methods
     public KanbanBoard? GetContainer(Guid guid)
@@ -150,33 +179,6 @@ public sealed class LocalDatabase : Undoable, IDatabase<KanbanBoard>
     {
         return _loadedContainers.Values;
     }
-    #endregion
-
-    #region Initialization
-    public void Init() => (this as ISerializable<bool>).LoadAsync().Wait();
-
-    public void DeInit() => (this as ISerializable<bool>).SaveAsync().Wait();
-
-    public Task<bool> PreLoadContainers()
-    {
-        return Task.Run(() =>
-        {
-            Parallel.ForEach(Index[ItemStatus.ONGOING], kv =>
-            {
-                loadContainer(kv.Key, kv.Value);
-            });
-            return true;
-        });
-    }
-
-    private KanbanBoard loadContainer(Guid guid, KanbanBoard.MetaData metaData)
-    {
-        KanbanBoard board = Load<KanbanBoard>(metaData.FilePath).Result;
-        _loadedContainers.Add(guid, board);
-        return board;
-    }
-
-    public string GetRelativeFilePath(string name) { return Path.Combine(_ContainerDataDir, name); }
     #endregion
 
     #region Serialization

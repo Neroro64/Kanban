@@ -5,10 +5,6 @@ using System.Management.Automation;
 [OutputType(typeof(Dictionary<ItemStatus, Dictionary<Guid, KanbanBoard.MetaData>>))]
 public class GetKanbanIndexCommand : Cmdlet
 {
-    protected override void ProcessRecord()
-    {
-        Console.Out.WriteLine("Yo");
-    }
     protected override void EndProcessing()
     {
         WriteObject(LocalDatabase.s_Database.Index, true);
